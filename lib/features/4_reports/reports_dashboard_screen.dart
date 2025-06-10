@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:salom_pos/app/config/app_theme.dart';
 import 'package:salom_pos/features/4_reports/reports_cubit.dart';
 
@@ -69,7 +70,23 @@ class ReportsDashboardView extends StatelessWidget {
                 const SizedBox(height: 16),
                 _buildSectionTitle('Tugab Borayotganlar'),
                  ...state.lowStockProducts.map((p) => Card(child: ListTile(title: Text(p.name), trailing: const Text('5 dona qoldi', style: TextStyle(color: Colors.orange))))),
-
+                 const SizedBox(height: 24),
+                // Yangi tugma
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.inventory),
+                    label: const Text('Barcha Mahsulotlarni Ko\'rish'),
+                    onPressed: () {
+                      // Mahsulotlar sahifasiga o'tish
+                      context.goNamed('products');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+                    ),
+                  ),
+                )
               ],
             ),
           );
@@ -174,5 +191,6 @@ class ReportsDashboardView extends StatelessWidget {
       maxLines: 1,
     ),
   );
+  
 }
 }

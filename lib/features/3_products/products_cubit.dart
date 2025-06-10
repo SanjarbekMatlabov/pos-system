@@ -15,10 +15,7 @@ class ProductsState extends Equatable {
     this.products = const [],
   });
 
-  ProductsState copyWith({
-    ProductStatus? status,
-    List<Product>? products,
-  }) {
+  ProductsState copyWith({ProductStatus? status, List<Product>? products}) {
     return ProductsState(
       status: status ?? this.status,
       products: products ?? this.products,
@@ -43,5 +40,26 @@ class ProductsCubit extends Cubit<ProductsState> {
     } catch (e) {
       emit(state.copyWith(status: ProductStatus.error));
     }
+  }
+
+  // YANGI FUNKSIYA
+  Future<void> addProduct({
+    required String name,
+    required double price,
+    required String barcode,
+  }) async {
+    await _productsRepository.addProduct(
+      name: name,
+      price: price,
+      barcode: barcode,
+    );
+    // Mahsulot qo'shilgandan so'ng ro'yxatni qayta yuklaymiz
+    await loadProducts();
+  }
+
+  // YANGI FUNKSIYA
+  Future<void> updateProduct(Product product) async {
+    await _productsRepository.updateProduct(product);
+    await loadProducts();
   }
 }
