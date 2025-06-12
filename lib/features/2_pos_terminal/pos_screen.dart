@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salom_pos/features/2_pos_terminal/pos_cubit.dart';
-import 'package:salom_pos/features/3_products/product_model.dart';
-
-// Soxta ma'lumotlar bazasi (test uchun)
-const List<Product> fakeProducts = [
-  Product(id: '1', name: 'Coca-Cola 1.5L', price: 12000, barcode: '86001'),
-  Product(id: '2', name: 'Fanta 1.5L', price: 12000, barcode: '86002'),
-  Product(id: '3', name: 'Non (buxanka)', price: 2800, barcode: '86003'),
-  Product(id: '4', name: 'Nestle Suv 1L', price: 3000, barcode: '86004'),
-];
+import 'pos_cubit.dart';
+import 'pos_repository.dart';
 
 class PosScreen extends StatelessWidget {
   const PosScreen({super.key});
@@ -17,122 +9,107 @@ class PosScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => PosCubit(),
+      create: (context) => PosCubit(PosRepository()),
       child: const PosView(),
     );
   }
 }
 
-class PosView extends StatelessWidget {
+class PosView extends StatefulWidget {
   const PosView({super.key});
+  @override
+  State<PosView> createState() => _PosViewState();
+}
+
+class _PosViewState extends State<PosView> {
+  final _barcodeController = TextEditingController();
+  final _barcodeFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _barcodeController.dispose();
+    _barcodeFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onBarcodeScanned(String barcode) {
+    if (barcode.isNotEmpty) {
+      context.read<PosCubit>().addProductByBarcode(barcode);
+    }
+    _barcodeController.clear();
+    _barcodeFocusNode.requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sotuv Terminali'),
-        actions: [
-          // Test uchun "Scan" tugmasi
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () {
-              // Tasodifiy mahsulotni savatga qo'shamiz (skanerlash imitatsiyasi)
-              final product = fakeProducts[(DateTime.now().second % fakeProducts.length)];
-              context.read<PosCubit>().addProduct(product);
-            },
-            tooltip: 'Mahsulot Skanerlash',
+        title: SizedBox(
+          width: 250, height: 40,
+          child: TextField(
+            controller: _barcodeController,
+            focusNode: _barcodeFocusNode,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Skanerlang...'),
+            onSubmitted: _onBarcodeScanned,
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            onPressed: () {
-              context.read<PosCubit>().clearCart();
-            },
-            tooltip: 'Savatni tozalash',
-          ),
-        ],
+        ),
       ),
-      body: BlocBuilder<PosCubit, PosState>(
-        builder: (context, state) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // CHAP PANEL: Savat ro'yxati
-              Expanded(
-                flex: 7,
-                child: state.cartItems.isEmpty
-                    ? const Center(child: Text('Savat bo\'sh. Skanerlang...', style: TextStyle(fontSize: 20)))
-                    : ListView.builder(
-                        itemCount: state.cartItems.length,
-                        itemBuilder: (context, index) {
-                          final item = state.cartItems[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            child: ListTile(
-                              title: Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('${item.product.price} so\'m x ${item.quantity}'),
-                              trailing: SizedBox(
-                                width: 150,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text('${item.totalPrice} so\'m', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                    const SizedBox(width: 10),
-                                    IconButton(onPressed: () => context.read<PosCubit>().decrementQuantity(item), icon: const Icon(Icons.remove_circle)),
-                                    IconButton(onPressed: () => context.read<PosCubit>().incrementQuantity(item), icon: const Icon(Icons.add_circle)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              // O'NG PANEL: Jami hisob va to'lov
-              Expanded(
-                flex: 3,
-                child: Card(
-                  margin: const EdgeInsets.all(8.0),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text('Umumiy Hisob', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        const Divider(height: 30),
-                        _buildSummaryRow('Oraliq Jami:', '${state.subtotal} so\'m'),
-                        const SizedBox(height: 10),
-                        _buildSummaryRow('Chegirma:', '0 so\'m'),
-                        const Divider(height: 30),
-                        _buildSummaryRow('JAMI:', '${state.total} so\'m', isTotal: true),
-                        const Spacer(),
-                        ElevatedButton(
-                          onPressed: state.cartItems.isEmpty ? null : () { /* To'lov logikasi keyin qo'shiladi */ },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.all(20),
-                            backgroundColor: Theme.of(context).colorScheme.secondary,
-                          ),
-                          child: const Text("To'lovga o'tish", style: TextStyle(fontSize: 18)),
-                        ),
-                      ],
-                    ),
+      body: BlocListener<PosCubit, PosState>(
+        listener: (context, state) {
+          if (state.status == PosStatus.productNotFound) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Mahsulot topilmadi!"), backgroundColor: Colors.orange));
+          } else if (state.status == PosStatus.error) {
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Xatolik yoki mahsulot qolmagan!"), backgroundColor: Colors.red));
+          } else if (state.status == PosStatus.success) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sotuv muvaffaqiyatli amalga oshirildi!"), backgroundColor: Colors.green));
+          }
+        },
+        child: BlocBuilder<PosCubit, PosState>(
+          builder: (context, state) {
+            return Row(
+              children: [
+                Expanded(
+                  flex: 7,
+                  child: ListView.builder(
+                    itemCount: state.cart.length,
+                    itemBuilder: (context, index) {
+                      final product = state.cart[index];
+                      return ListTile(title: Text(product.name), trailing: Text("${product.price} so'm"));
+                    },
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                Expanded(
+                  flex: 3,
+                  child: Card(
+                    margin: const EdgeInsets.all(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text("Jami: ${state.total} so'm", style: Theme.of(context).textTheme.headlineSmall),
+                          const Spacer(),
+                          ElevatedButton(
+                            onPressed: state.cart.isEmpty ? null : () => context.read<PosCubit>().completeSale('Naqd'),
+                            child: const Text("To'lov (Naqd)"),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () => context.read<PosCubit>().clearCart(),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text("Bekor qilish"),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                ),
+              ],
+            );
+          },
+        ),
       ),
-    );
-  }
-
-  Widget _buildSummaryRow(String title, String value, {bool isTotal = false}) {
-    final style = TextStyle(
-      fontSize: isTotal ? 20 : 16,
-      fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-    );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [Text(title, style: style), Text(value, style: style)],
     );
   }
 }

@@ -1,41 +1,49 @@
-import 'package:salom_pos/features/3_products/product_model.dart';
-import 'package:uuid/uuid.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart'; // `flutter pub add uuid` buyrug'i bilan o'rnatib oling
+import '../../app/data/database_helper.dart';
+import 'product_model.dart';
 
 class ProductsRepository {
-  final List<Product> _products = [
-    // ... avvalgi ro'yxat
-    const Product(id: '1', name: 'Coca-Cola 1.5L', price: 12000, barcode: '86001'),
-    const Product(id: '2', name: 'Fanta 1.5L', price: 12000, barcode: '86002'),
-    const Product(id: '3', name: 'Non (buxanka)', price: 2800, barcode: '86003'),
-    const Product(id: '4', name: 'Nestle Suv 1L', price: 3000, barcode: '86004'),
-    const Product(id: '5', name: 'Oltin Don Un 2kg', price: 18000, barcode: '86005'),
-    const Product(id: '6', name: 'Moy 1L', price: 22000, barcode: '86006'),
-  ];
+  final dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
 
-  Future<List<Product>> getProducts() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return _products;
+  // Barcha mahsulotlarni o'qish (Read)
+  Future<List<Product>> getAllProducts() async {
+    final db = await dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query('products');
+    return List.generate(maps.length, (i) {
+      return Product.fromMap(maps[i]);
+    });
   }
 
-  // YANGI FUNKSIYA: Mahsulot qo'shish
-  Future<void> addProduct({required String name, required double price, required String barcode}) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final newProduct = Product(
-      id: _uuid.v4(), // Yangi unikal ID yaratish
-      name: name,
-      price: price,
-      barcode: barcode,
+  // Yangi mahsulot qo'shish (Create)
+  Future<void> addProduct(Product product) async {
+    final db = await dbHelper.database;
+    await db.insert(
+      'products',
+      product.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    _products.add(newProduct);
   }
 
-  // YANGI FUNKSIYA: Mahsulotni yangilash
+  // Mahsulotni tahrirlash (Update)
   Future<void> updateProduct(Product product) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final index = _products.indexWhere((p) => p.id == product.id);
-    if (index != -1) {
-      _products[index] = product;
-    }
+    final db = await dbHelper.database;
+    await db.update(
+      'products',
+      product.toMap(),
+      where: 'id = ?',
+      whereArgs: [product.id],
+    );
+  }
+
+  // Mahsulotni o'chirish (Delete)
+  Future<void> deleteProduct(String id) async {
+    final db = await dbHelper.database;
+    await db.delete(
+      'products',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

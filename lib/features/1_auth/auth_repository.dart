@@ -1,25 +1,63 @@
-// Bu sinfning vazifasi avtorizatsiya bilan bog'liq ma'lumotlar operatsiyalarini bajarish.
-// Masalan, serverga login va parol yuborib, javobini olish.
+import 'package:sqflite/sqflite.dart';
+import '../../app/data/database_helper.dart';
+import 'user_model.dart';
+
 class AuthRepository {
+  final dbHelper = DatabaseHelper.instance;
 
-  // Foydalanuvchi ma'lumotlarini tekshiruvchi funksiya.
-  // Kelajakda bu yerda serverga haqiqiy so'rov ketadi.
-  Future<String> login({
-    required String username,
-    required String password,
-  }) async {
-    // Server javobini kutishni imitatsiya qilamiz (1.5 soniya)
-    await Future.delayed(const Duration(milliseconds: 1500));
+  // Foydalanuvchini login va parol bo'yicha tekshirish
+  Future<User?> login(String username, String password) async {
+    final db = await dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'username = ? AND password_hash = ?',
+      whereArgs: [username, password], // Haqiqiy loyihada bu yerda hash solishtiriladi
+    );
 
-    if (username.toLowerCase() == 'kassir' && password == '12345') {
-      // Agar kassir bo'lsa, uning rolini qaytaramiz
-      return 'pos_home'; 
-    } else if (username.toLowerCase() == 'admin' && password == 'admin123') {
-      // Agar admin bo'lsa, uning rolini qaytaramiz
-      return 'admin_home';
-    } else {
-      // Agar ma'lumotlar noto'g'ri bo'lsa, xatolik qaytaramiz
-      throw 'Login yoki parol xato!';
+    if (maps.isNotEmpty) {
+      return User.fromMap(maps.first);
     }
+    return null;
+  }
+
+  // Ilova birinchi ishga tushganda boshlang'ich foydalanuvchilarni qo'shish
+  Future<void> addInitialUsers() async {
+    final db = await dbHelper.database;
+    // Admin foydalanuvchisi
+    await db.insert(
+      'users',
+      User(username: 'admin', passwordHash: 'admin123', role: 'admin').toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore, // Agar mavjud bo'lsa, xatolik bermaydi
+    );
+    // Kassir foydalanuvchisi
+    await db.insert(
+      'users',
+      User(username: 'kassir', passwordHash: '12345', role: 'kassir').toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+  Future<List<User>> getAllUsers() async {
+    final db = await dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query('users');
+    return List.generate(maps.length, (i) => User.fromMap(maps[i]));
+  }
+
+  // Yangi foydalanuvchi qo'shish
+  Future<void> addUser(User user) async {
+    final db = await dbHelper.database;
+    await db.insert('users', user.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.fail); // Takrorlanmasligi uchun
+  }
+
+  // Foydalanuvchi ma'lumotlarini yangilash
+  Future<void> updateUser(User user) async {
+    final db = await dbHelper.database;
+    await db.update('users', user.toMap(), where: 'id = ?', whereArgs: [user.id]);
+  }
+
+  // Foydalanuvchini o'chirish
+  Future<void> deleteUser(int id) async {
+    final db = await dbHelper.database;
+    await db.delete('users', where: 'id = ?', whereArgs: [id]);
   }
 }

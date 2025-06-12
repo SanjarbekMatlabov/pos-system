@@ -1,65 +1,53 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salom_pos/features/3_products/product_model.dart';
-import 'package:salom_pos/features/3_products/products_repository.dart';
+import 'package:equatable/equatable.dart';
+import 'products_repository.dart';
+import 'product_model.dart';
 
-// --- STATE ---
-enum ProductStatus { initial, loading, success, error }
+// State klasslari (o'zgarishsiz qoladi)
+part 'products_state.dart'; // State'larni alohida faylga chiqaramiz
 
-class ProductsState extends Equatable {
-  final ProductStatus status;
-  final List<Product> products;
-
-  const ProductsState({
-    this.status = ProductStatus.initial,
-    this.products = const [],
-  });
-
-  ProductsState copyWith({ProductStatus? status, List<Product>? products}) {
-    return ProductsState(
-      status: status ?? this.status,
-      products: products ?? this.products,
-    );
-  }
-
-  @override
-  List<Object?> get props => [status, products];
-}
-
-// --- CUBIT ---
 class ProductsCubit extends Cubit<ProductsState> {
-  final ProductsRepository _productsRepository;
+  final ProductsRepository _repository;
 
-  ProductsCubit(this._productsRepository) : super(const ProductsState());
+  ProductsCubit(this._repository) : super(ProductsInitial());
 
-  Future<void> loadProducts() async {
-    emit(state.copyWith(status: ProductStatus.loading));
+  // Barcha mahsulotlarni yuklash
+  Future<void> fetchProducts() async {
+    emit(ProductsLoading());
     try {
-      final products = await _productsRepository.getProducts();
-      emit(state.copyWith(status: ProductStatus.success, products: products));
-    } catch (e) {
-      emit(state.copyWith(status: ProductStatus.error));
+      final products = await _repository.getAllProducts();
+      emit(ProductsLoaded(products));
+    } catch (_) {
+      emit(ProductsError("Mahsulotlarni yuklashda xatolik!"));
     }
   }
 
-  // YANGI FUNKSIYA
-  Future<void> addProduct({
-    required String name,
-    required double price,
-    required String barcode,
-  }) async {
-    await _productsRepository.addProduct(
-      name: name,
-      price: price,
-      barcode: barcode,
-    );
-    // Mahsulot qo'shilgandan so'ng ro'yxatni qayta yuklaymiz
-    await loadProducts();
+  // Mahsulot qo'shish
+  Future<void> addProduct(Product product) async {
+    try {
+      await _repository.addProduct(product);
+      fetchProducts(); // Ro'yxatni yangilash
+    } catch (_) {
+      emit(ProductsError("Mahsulot qo'shishda xatolik!"));
+    }
   }
 
-  // YANGI FUNKSIYA
   Future<void> updateProduct(Product product) async {
-    await _productsRepository.updateProduct(product);
-    await loadProducts();
+    try {
+      await _repository.updateProduct(product);
+      fetchProducts(); // Ro'yxatni yangilash
+    } catch (_) {
+      emit(ProductsError("Mahsulotni tahrirlashda xatolik!"));
+    }
+  }
+
+  // Mahsulotni o'chirish
+  Future<void> deleteProduct(String id) async {
+    try {
+      await _repository.deleteProduct(id);
+      fetchProducts(); // Ro'yxatni yangilash
+    } catch (_) {
+      emit(ProductsError("Mahsulotni o'chirishda xatolik!"));
+    }
   }
 }
